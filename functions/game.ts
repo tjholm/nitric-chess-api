@@ -47,6 +47,27 @@ chessApi.get("/game/:name/moves", async (ctx) => {
     }
 });
 
+chessApi.get("/game", async (ctx) => {
+    const gameStream = gamesCollection.query().stream();
+
+    const games: any[] = [];
+
+    gameStream.on('data', (game) => {
+        games.push({ id: game.ref.id, ...game.content});
+    });
+
+    await new Promise<void>((res) => {
+        gameStream.on('end', () => {
+            res();
+        });
+    });
+
+    ctx.res.body = JSON.stringify(games);
+    ctx.res.headers['Content-Type'] = ['application/json']; 
+
+    return ctx;
+});
+
 // create a new game
 chessApi.post("/game", async (ctx) => {
     const chess = new Chess();
