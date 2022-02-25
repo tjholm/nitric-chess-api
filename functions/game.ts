@@ -2,12 +2,18 @@ import { api, collection, schedule } from "@nitric/sdk";
 import { Chess, Square } from "chess.js";
 import short from "short-uuid";
 import { CollectionRef } from "@nitric/sdk/lib/api/documents/v0/collection-ref";
+import { notifyPlayerTopic } from '../resources';
+import { Player } from '../types';
 
 interface GameState {
     fen: string;
     fin?: boolean;
     lastUpdate?: number;
+    whitePlayer: Player;
+    blackPlayer: Player;
 }
+
+const notifyPlayer = notifyPlayerTopic.for('publishing').publish;
 
 const gamesCollection: CollectionRef<GameState> = collection('games').for('reading', 'writing', 'deleting');
 
@@ -20,11 +26,14 @@ chessApi.get("/game/:name", async (ctx) => {
         const { fen } = await gamesCollection.doc(name).get();
         const chess = new Chess(fen);
     
-        ctx.res.body = chess.ascii();
+        ctx.res.headers['Content-Type'] = ['application/json'];
+        ctx.res.body = JSON.stringify({
+          moves: chess.moves({ verbose: true }),
+          fen: chess.fen(),
+        });
     } catch (e) {
         ctx.res.body = `Could not find game ${name}`;
         ctx.res.status = 404;
-
     }
     return ctx;
 });
@@ -73,15 +82,24 @@ chessApi.post("/game", async (ctx) => {
     const chess = new Chess();
     const gameId = short.generate();
 
+    const { w, b } = ctx.req.json() as { w: Player, b: Player };
+
     const now = new Date().getTime();
 
     await gamesCollection.doc(gameId).set({
         fen: chess.fen(),
         fin: false,
         lastUpdate: now,
+        whitePlayer: w,
+        blackPlayer: b
     });
 
-    ctx.res.body = `Game ${gameId} Created 
+    // notify the first player it's there turn
+    notifyPlayer({
+        payload: { player: w, game: gameId },
+    });
+
+    ctx.res.body = `Game ${gameId} Created;
 ${chess.ascii()}
     `;
 
@@ -93,7 +111,7 @@ chessApi.post("/game/:name", async (ctx) => {
     const { from, to } = ctx.req.json() as Record<string, Square>;
 
     try {
-        const { fen } = await gamesCollection.doc(name).get();
+        const { fen, whitePlayer, blackPlayer } = await gamesCollection.doc(name).get();
         const game = new Chess(fen);
     
         const move = game.move({ from, to });
@@ -110,13 +128,27 @@ chessApi.post("/game/:name", async (ctx) => {
             fen: game.fen(),
             fin: finished,
             lastUpdate: new Date().getTime(),
-        })
+            whitePlayer,
+            blackPlayer,
+        });
     
         ctx.res.body = game.ascii();
     
         if (finished) {
             ctx.res.body = "game over\n" + ctx.res.body;
-        }
+            // TODO: notify game end
+        } else {
+            const currentPlayer = game.turn() == 'b'
+             ? blackPlayer
+             : whitePlayer;
+            // notify the next player it's there turn
+            notifyPlayer({
+                payload: {
+                    player: currentPlayer,
+                    game: name,
+                }
+            });
+        }      
     
         return ctx;
     } catch (e) {
