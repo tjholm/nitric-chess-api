@@ -5,7 +5,7 @@ import { frontendUrl, stackToken } from "../env";
 import { WebClient } from '@slack/web-api';
 
 notifyPlayerTopic.subscribe(async (ctx) => {
-    const { player, game } = ctx.req.json() as { game: string, player: Player };
+    const { player, game, token } = ctx.req.json() as { token: string, game: string, player: Player };
 
     const wc = new WebClient(stackToken);
 
@@ -17,7 +17,7 @@ notifyPlayerTopic.subscribe(async (ctx) => {
         channel: user.user.id,
         text: `Hi ${user.user.name}
           It's your turn to move
-          ${frontendUrl}/chess/${game}
+          ${frontendUrl}/chess/${game}?token=${token}
         `
     });
 });

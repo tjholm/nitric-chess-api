@@ -11,6 +11,7 @@ interface GameState {
     lastUpdate?: number;
     whitePlayer: Player;
     blackPlayer: Player;
+    token: string;
 }
 
 const notifyPlayer = notifyPlayerTopic.for('publishing').publish;
@@ -85,18 +86,20 @@ chessApi.post("/game", async (ctx) => {
     const { w, b } = ctx.req.json() as { w: Player, b: Player };
 
     const now = new Date().getTime();
+    const nextTurnToken = short.generate();
 
     await gamesCollection.doc(gameId).set({
         fen: chess.fen(),
         fin: false,
         lastUpdate: now,
         whitePlayer: w,
-        blackPlayer: b
+        blackPlayer: b,
+        token: nextTurnToken,
     });
 
     // notify the first player it's there turn
     notifyPlayer({
-        payload: { player: w, game: gameId },
+        payload: { player: w, game: gameId, token: nextTurnToken },
     });
 
     ctx.res.body = `Game ${gameId} Created;
@@ -108,11 +111,18 @@ ${chess.ascii()}
 
 chessApi.post("/game/:name", async (ctx) => {
     const { name } = ctx.req.params;
+    const { token } = ctx.req.query as any as Record<string, string>;
     const { from, to } = ctx.req.json() as Record<string, Square>;
 
     try {
-        const { fen, whitePlayer, blackPlayer } = await gamesCollection.doc(name).get();
+        const { fen, whitePlayer, blackPlayer, token: ntToken } = await gamesCollection.doc(name).get();
         const game = new Chess(fen);
+
+        if (!token || token !== ntToken) {
+            ctx.res.status = 403;
+            ctx.res.body = `Not authorized!`;
+            return ctx;
+        }
     
         const move = game.move({ from, to });
     
@@ -123,6 +133,8 @@ chessApi.post("/game/:name", async (ctx) => {
         }
     
         const finished = game.in_checkmate() || game.in_draw() || game.in_stalemate();
+        // generate a new next turn token
+        const nextTurnToken = short.generate();
     
         await gamesCollection.doc(name).set({ 
             fen: game.fen(),
@@ -130,6 +142,7 @@ chessApi.post("/game/:name", async (ctx) => {
             lastUpdate: new Date().getTime(),
             whitePlayer,
             blackPlayer,
+            token: nextTurnToken,
         });
     
         ctx.res.body = game.ascii();
@@ -146,6 +159,7 @@ chessApi.post("/game/:name", async (ctx) => {
                 payload: {
                     player: currentPlayer,
                     game: name,
+                    token: nextTurnToken,
                 }
             });
         }      
