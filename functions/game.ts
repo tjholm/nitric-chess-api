@@ -98,7 +98,7 @@ chessApi.post("/game", async (ctx) => {
     });
 
     // notify the first player it's there turn
-    notifyPlayer({
+    await notifyPlayer({
         payload: { player: w, game: gameId, token: nextTurnToken },
     });
 
@@ -155,7 +155,7 @@ chessApi.post("/game/:name", async (ctx) => {
              ? blackPlayer
              : whitePlayer;
             // notify the next player it's there turn
-            notifyPlayer({
+            await notifyPlayer({
                 payload: {
                     player: currentPlayer,
                     game: name,
