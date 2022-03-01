@@ -167,8 +167,7 @@ chessApi.post("/game/:name", getGame, async (ctx) => {
 });
 
 // cleanup games once per day
-// TODO: Update to day when we've finished testing
-schedule("cleanup-finished-games").every("hour", async (ctx) => {
+schedule("finished-cleanup").every("day", async (ctx) => {
   const gameStream = gamesCollection
     .query()
     .where("fin", "==", "true")
@@ -185,10 +184,12 @@ schedule("cleanup-finished-games").every("hour", async (ctx) => {
   });
 });
 
-const staleGameTimeMs = 30 * 60 * 1000;
+// A week in milliseconds
+const GAME_STALE_DAYS = 3;
+const staleGameTimeMs = GAME_STALE_DAYS * 24 * 60 * 60 * 1000;
+
 // cleanup idle games once per week
-// TODO: change to 7 days once testing is finished
-schedule("cleanup-idle-games").every("hour", async (ctx) => {
+schedule("idle-cleanup").every("7 days", async (ctx) => {
   const staleTime = new Date().getTime() - staleGameTimeMs;
   const gameStream = gamesCollection
     .query()
