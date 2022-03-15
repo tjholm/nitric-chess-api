@@ -1,0 +1,3 @@
+name: chess-api
+handlers:
+  - functions/*.ts
