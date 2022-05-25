@@ -2,7 +2,6 @@
   "name": "typescript-starter",
   "version": "1.0.0",
   "description": "nitric typescript starter template",
-  "main": "index.js",
   "private": true,
   "dependencies": {
     "@nitric/sdk": "0.3.1-rc.4",
@@ -14,6 +13,13 @@
     "short-uuid": "^4.2.0"
   },
   "devDependencies": {
-    "@types/chess.js": "^0.11.2"
+    "@pulumi/aws": "^5.4.0",
+    "@pulumi/pulumi": "^3.33.1",
+    "@types/chess.js": "^0.11.2",
+    "ts-node": "^10.8.0",
+    "yaml": "^2.1.0"
+  },
+  "scripts": {
+    "dns": "ts-node ./infra/alias.ts"
   }
 }
