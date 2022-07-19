@@ -14,16 +14,16 @@ notifyPlayerTopic.subscribe(async (ctx) => {
 
     if (!finished) {
         await wc.chat.postMessage({
-            channel: user.user.id,
-            text: `Hi ${user.user.name}
+            channel: user.user!.id!,
+            text: `Hi ${user.user!.name}
               It's your turn to move
               ${frontendUrl}/chess/${game}?token=${token}
             `
         });
     } else {
         await wc.chat.postMessage({
-            channel: user.user.id,
-            text: `Hi ${user.user.name}
+            channel: user.user!.id!,
+            text: `Hi ${user.user!.name}
               It's game over see the finished game at:
               ${frontendUrl}/chess/${game}
             `

@@ -1,7 +1,6 @@
-import { api, collection, schedule } from "@nitric/sdk";
+import { api, collection, schedule, faas } from "@nitric/sdk";
 import { Chess, Square } from "chess.js";
 import short from "short-uuid";
-import { CollectionRef } from "@nitric/sdk/lib/api/documents/v0/collection-ref";
 import { notifyPlayerTopic } from "../resources";
 import { Player } from "../types";
 import { HttpContext, HttpMiddleware } from "@nitric/sdk/lib/faas";
@@ -15,8 +14,8 @@ interface GameState {
   token?: string;
 }
 
-const notifyPlayer = notifyPlayerTopic.for("publishing").publish;
-const gamesCollection: CollectionRef<GameState> = collection("games").for(
+const notifyPlayer = notifyPlayerTopic.for("publishing");
+const gamesCollection = collection<GameState>("games").for(
   "reading",
   "writing",
   "deleting"
@@ -45,7 +44,7 @@ export const getGame: HttpMiddleware = async (ctx, next) => {
     return ctx;
   }
 
-  return next(ctx);
+  return next && next(ctx);
 };
 
 // create a new game
@@ -68,7 +67,7 @@ chessApi.post("/game", async (ctx) => {
   });
 
   // notify the first player it's there turn
-  await notifyPlayer({
+  await notifyPlayer.publish({
     payload: { player: w, game: gameId, token: nextTurnToken },
   });
 
@@ -80,7 +79,7 @@ chessApi.post("/game", async (ctx) => {
 });
 
 // get game detail
-chessApi.get("/game/:name", getGame, async (ctx) => {
+chessApi.get("/game/:name", faas.createHandler(getGame, async (ctx) => {
   const { game } = ctx as HttpGameContext;
   const { fen } = game;
   const chess = new Chess(fen);
@@ -92,10 +91,10 @@ chessApi.get("/game/:name", getGame, async (ctx) => {
   });
 
   return ctx;
-});
+}));
 
 // make a move
-chessApi.post("/game/:name", getGame, async (ctx) => {
+chessApi.post("/game/:name", faas.createHandler(getGame, async (ctx) => {
   const { game: state } = ctx as HttpGameContext;
   const { name } = ctx.req.params;
   const { token } = ctx.req.query as any as Record<string, string>;
@@ -141,7 +140,7 @@ chessApi.post("/game/:name", getGame, async (ctx) => {
     // notify all player the game is over
     await Promise.all(
       [blackPlayer, whitePlayer].map(async (p) => {
-        return await notifyPlayer({
+        return await notifyPlayer.publish({
           payload: {
             player: p,
             game: name,
@@ -154,7 +153,7 @@ chessApi.post("/game/:name", getGame, async (ctx) => {
   } else {
     const currentPlayer = game.turn() == "b" ? blackPlayer : whitePlayer;
     // notify the next player it's there turn
-    await notifyPlayer({
+    await notifyPlayer.publish({
       payload: {
         player: currentPlayer,
         game: name,
@@ -164,7 +163,7 @@ chessApi.post("/game/:name", getGame, async (ctx) => {
   }
 
   return ctx;
-});
+}));
 
 // cleanup games once per day
 schedule("finished-cleanup").every("day", async (ctx) => {
