@@ -1,4 +1,4 @@
-import { api, collection, schedule, faas } from "@nitric/sdk";
+import { api, collection, schedule, faas, jwt } from "@nitric/sdk";
 import { Chess, Square } from "chess.js";
 import short from "short-uuid";
 import { notifyPlayerTopic } from "../resources";
@@ -21,7 +21,18 @@ const gamesCollection = collection<GameState>("games").for(
   "deleting"
 );
 
-const chessApi = api("chess");
+const issuer = process.env.JWT_ISSUER || "https://dev-fn1x0c3o.us.auth0.com/";
+const audience = process.env.JWT_AUDIENCE || "testing";
+
+const chessApi = api("chess", {
+  securityDefinitions: {
+    user: jwt({
+      issuer,
+      audiences: [audience],
+    })
+  },
+  security: { user: [] }
+});
 
 type HttpGameContext = HttpContext & { game: GameState };
 
